@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output {
+            width: 100%;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        #downloadButton {
+            display: none;
+            margin-top: 10px;
+        }
+        #videoPlayer {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+        }
+        #loading {
+            display: none;
+            margin-top: 10px;
+        }
+        #sendButton {
+            background-color: initial;
+        }
+        #sendButton.disabled, #downloadButton.disabled {
+            background-color: blue;
+            color: white;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Echo Client</h1>
+    <input type="text" id="messageInput" placeholder="Enter your message" style="width: 100%; padding: 10px;">
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+    <div id="loading">Loading...</div>
+    <button id="downloadButton" onclick="downloadVideo()">Download Video</button>
+    <video id="videoPlayer" controls></video>
+    <div id="output"></div>
+
+    <script>
+        const SERVER_URL = "https://8315-180-119-171-83.ngrok-free.app";
+        // const SERVER_URL = "http://localhost:16639";
+        let videoLink = "";
+        let currentBlobUrl = null;
+
+        function sendMessage() {
+            const message = document.getElementById("messageInput").value;
+            const sendButton = document.getElementById("sendButton");
+            const controller = new AbortController();
+            const signal = controller.signal;
+
+            sendButton.classList.add("disabled");
+            // setTimeout(() => {
+            //     sendButton.classList.remove("disabled");
+            // }, 55000);
+
+            document.getElementById("loading").style.display = "block";
+            const timeoutId = setTimeout(() => controller.abort(), 80000);
+
+            fetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message }),
+                signal: signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                document.getElementById("loading").style.display = "none";
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.body;
+            })
+            .then(rb => {
+                const reader = rb.getReader();
+                const decoder = new TextDecoder();
+                let output = document.getElementById("output");
+                output.innerHTML = "";
+
+                sendButton.classList.remove("disabled");
+
+                reader.read().then(function processText({ done, value }) {
+                    if (done) {
+                        return;
+                    }
+                    let text = decoder.decode(value);
+                    output.innerHTML += text.replace(/\n/g, "<br>");
+                    output.scrollTop = output.scrollHeight;
+                    if (text.includes("Download Video")) {
+                        const startIndex = text.indexOf("/download_video?");
+                        if (startIndex !== -1) {
+                            const endIndex = text.indexOf(".mp4", startIndex) + 4;
+                            videoLink = text.substring(startIndex, endIndex);
+                            document.getElementById("downloadButton").style.display = "block";
+                        }
+                    }
+                    return reader.read().then(processText);
+                });
+            })
+            .catch(error => {
+                document.getElementById("loading").style.display = "none";
+                sendButton.classList.remove("disabled");
+                console.error("Failed to connect to server:", error);
+                alert("Failed to connect to server: " + error);
+            });
+        }
+
+        function downloadVideo() {
+            const downloadButton = document.getElementById("downloadButton");
+
+            // 禁用下载按钮并变为蓝色
+            downloadButton.classList.add("disabled");
+            // setTimeout(() => {
+            //     downloadButton.classList.remove("disabled");
+            // }, 10000);
+
+            if (currentBlobUrl) {
+                window.URL.revokeObjectURL(currentBlobUrl);
+                console.log("Previous Blob URL revoked");
+            }
+
+            console.log(`Downloading video from ${SERVER_URL}${videoLink}`);
+            fetch(`${SERVER_URL}${videoLink}`, {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                currentBlobUrl = url; // 更新当前的 blob URL
+
+                // 显示并播放视频
+                const videoPlayer = document.getElementById("videoPlayer");
+                videoPlayer.src = url;
+                videoPlayer.style.display = "block";
+                videoPlayer.load();
+                videoPlayer.onloadeddata = () => {
+                    videoPlayer.play();
+                };
+
+                // 提供下载链接
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = videoLink.split('=')[1];
+                document.body.appendChild(a);
+                a.click();
+
+                downloadButton.classList.remove("disabled");
+                alert("Video saved to your downloads folder");
+            })
+            .catch(error => {
+                console.error("Failed to download video:", error);
+                alert("Failed to download video: " + error);
+                downloadButton.classList.remove("disabled");
+            });
+        }
+
+        // 页面卸载时撤销当前的 blob URL
+        window.addEventListener('beforeunload', () => {
+            if (currentBlobUrl) {
+                window.URL.revokeObjectURL(currentBlobUrl);
+                console.log("Blob URL revoked on unload");
+            }
+        });
+    </script>
+</body>
+</html>
