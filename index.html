@@ -10,7 +10,7 @@
             margin: 20px;
         }
         #output {
-            width: 100%;
+            width: 98%;
             height: 200px;
             overflow-y: scroll;
             border: 1px solid #ccc;
@@ -24,49 +24,99 @@
         #videoPlayer {
             display: none;
             width: 100%;
+            height: 600px; /* 调整视频框高度 */
             margin-top: 10px;
         }
         #loading {
             display: none;
             margin-top: 10px;
         }
-        #sendButton {
-            background-color: initial;
+        .button-27 {
+            appearance: none;
+            background-color: #000000;
+            border: 2px solid #1A1A1A;
+            border-radius: 15px;
+            box-sizing: border-box;
+            color: #FFFFFF;
+            cursor: pointer;
+            display: inline-block;
+            font-family: Roobert,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+            font-size: 16px;
+            font-weight: 600;
+            line-height: normal;
+            margin: 0;
+            min-height: 60px;
+            min-width: 0;
+            outline: none;
+            padding: 16px 24px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 300ms cubic-bezier(.23, 1, 0.32, 1);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            width: auto; /* 调整按钮宽度 */
+            width: 28%;
+            max-width: 300px; /* 设置最大宽度 */
+            will-change: transform;
+            /* float: left; 将按钮对齐到左侧 */
+            margin-right: 10px; /* 增加按钮之间的间距 */
         }
-        #sendButton.disabled, #downloadButton.disabled {
-            background-color: blue;
-            color: white;
+        .button-27:disabled {
+            background-color: #4F4F4F; /* 更深的灰色 */
             pointer-events: none;
+            cursor: not-allowed;
+        }
+        .button-27:hover:not(:disabled) {
+            box-shadow: rgba(0, 0, 0, 0.25) 0 8px 15px;
+            transform: translateY(-2px);
+        }
+        .button-27:active:not(:disabled) {
+            box-shadow: none;
+            transform: translateY(0);
+        }
+        /* 清除浮动 */
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
         }
     </style>
 </head>
 <body>
-    <h1>Echo Client</h1>
-    <input type="text" id="messageInput" placeholder="Enter your message" style="width: 100%; padding: 10px;">
-    <button id="sendButton" onclick="sendMessage()">Send</button>
-    <div id="loading">Loading...</div>
-    <button id="downloadButton" onclick="downloadVideo()">Download Video</button>
+    <h1>Motion Generator</h1>
+    <input type="text" id="messageInput" placeholder="Enter your message" style="width: 98%; padding: 10px; font-size: 18px;">
+    <div class="clearfix">
+        <button id="sendButton" class="button-27" onclick="sendMessage()">Send</button>
+    </div>
+    <div id="loading">Loading...(40 sec)</div>
     <video id="videoPlayer" controls></video>
+    <button id="downloadButton" class="button-27" onclick="downloadVideo()">Download Video</button>
     <div id="output"></div>
 
     <script>
-        const SERVER_URL = "https://8315-180-119-171-83.ngrok-free.app";
+        const SERVER_URL = "https://6b61-114-230-93-21.ngrok-free.app";
         // const SERVER_URL = "http://localhost:16639";
         let videoLink = "";
-        let currentBlobUrl = null;
+        let playbackBlobUrl = null; // 用于播放的视频 Blob URL
+        let downloadBlobUrl = null; // 用于下载的视频 Blob URL
 
         function sendMessage() {
             const message = document.getElementById("messageInput").value;
             const sendButton = document.getElementById("sendButton");
+            const downloadButton = document.getElementById("downloadButton");
+            const loading = document.getElementById("loading");
+            const output = document.getElementById("output");
             const controller = new AbortController();
             const signal = controller.signal;
 
-            sendButton.classList.add("disabled");
-            // setTimeout(() => {
-            //     sendButton.classList.remove("disabled");
-            // }, 55000);
+            // 禁用发送按钮和下载按钮
+            sendButton.disabled = true;
+            downloadButton.disabled = true;
 
-            document.getElementById("loading").style.display = "block";
+            loading.style.display = "block";
+            output.innerHTML = "";
+
             const timeoutId = setTimeout(() => controller.abort(), 80000);
 
             fetch(`${SERVER_URL}/echo`, {
@@ -79,7 +129,8 @@
             })
             .then(response => {
                 clearTimeout(timeoutId);
-                document.getElementById("loading").style.display = "none";
+                loading.style.display = "none";
+                sendButton.disabled = false; // 移除禁用状态
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -88,10 +139,6 @@
             .then(rb => {
                 const reader = rb.getReader();
                 const decoder = new TextDecoder();
-                let output = document.getElementById("output");
-                output.innerHTML = "";
-
-                sendButton.classList.remove("disabled");
 
                 reader.read().then(function processText({ done, value }) {
                     if (done) {
@@ -105,32 +152,83 @@
                         if (startIndex !== -1) {
                             const endIndex = text.indexOf(".mp4", startIndex) + 4;
                             videoLink = text.substring(startIndex, endIndex);
-                            document.getElementById("downloadButton").style.display = "block";
+                            downloadButton.style.display = "block";
+                            downloadButton.disabled = false; // 确保下载按钮可用
+
+                            // 自动下载并播放视频
+                            fetchAndPlayVideo(videoLink);
                         }
                     }
                     return reader.read().then(processText);
                 });
             })
             .catch(error => {
-                document.getElementById("loading").style.display = "none";
-                sendButton.classList.remove("disabled");
+                clearTimeout(timeoutId);
+                loading.style.display = "none";
+                sendButton.disabled = false; // 移除禁用状态
+                downloadButton.disabled = false; // 确保下载按钮可用
                 console.error("Failed to connect to server:", error);
                 alert("Failed to connect to server: " + error);
+            });
+        }
+
+        function fetchAndPlayVideo(link) {
+            if (!link) {
+                console.error("No video link provided.");
+                return;
+            }
+
+            // 显示加载状态
+            const loading = document.getElementById("loading");
+            loading.textContent = "Loading video...(40 sec)";
+            loading.style.display = "block";
+
+            fetch(`${SERVER_URL}${link}`, {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const videoPlayer = document.getElementById("videoPlayer");
+                
+                // 清理之前的播放 Blob URL
+                if (playbackBlobUrl) {
+                    window.URL.revokeObjectURL(playbackBlobUrl);
+                }
+
+                playbackBlobUrl = window.URL.createObjectURL(blob);
+                videoPlayer.src = playbackBlobUrl;
+                videoPlayer.style.display = "block";
+                videoPlayer.load();
+                videoPlayer.onloadeddata = () => {
+                    videoPlayer.play();
+                };
+
+                // 隐藏加载状态
+                loading.style.display = "none";
+            })
+            .catch(error => {
+                loading.style.display = "none";
+                console.error("Failed to load video:", error);
+                alert("Failed to load video: " + error);
             });
         }
 
         function downloadVideo() {
             const downloadButton = document.getElementById("downloadButton");
 
-            // 禁用下载按钮并变为蓝色
-            downloadButton.classList.add("disabled");
-            // setTimeout(() => {
-            //     downloadButton.classList.remove("disabled");
-            // }, 10000);
+            // 禁用下载按钮
+            downloadButton.disabled = true;
 
-            if (currentBlobUrl) {
-                window.URL.revokeObjectURL(currentBlobUrl);
-                console.log("Previous Blob URL revoked");
+            if (downloadBlobUrl) {
+                window.URL.revokeObjectURL(downloadBlobUrl);
+                console.log("Previous Download Blob URL revoked");
             }
 
             console.log(`Downloading video from ${SERVER_URL}${videoLink}`);
@@ -146,41 +244,41 @@
                 return response.blob();
             })
             .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                currentBlobUrl = url; // 更新当前的 blob URL
-
-                // 显示并播放视频
-                const videoPlayer = document.getElementById("videoPlayer");
-                videoPlayer.src = url;
-                videoPlayer.style.display = "block";
-                videoPlayer.load();
-                videoPlayer.onloadeddata = () => {
-                    videoPlayer.play();
-                };
+                downloadBlobUrl = window.URL.createObjectURL(blob);
 
                 // 提供下载链接
                 const a = document.createElement('a');
                 a.style.display = 'none';
-                a.href = url;
+                a.href = downloadBlobUrl;
                 a.download = videoLink.split('=')[1];
                 document.body.appendChild(a);
                 a.click();
 
-                downloadButton.classList.remove("disabled");
+                // 延迟撤销下载 Blob URL，确保下载完成
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(downloadBlobUrl);
+                    console.log("Download Blob URL revoked");
+                }, 10000); // 10秒后撤销
+
                 alert("Video saved to your downloads folder");
+                downloadButton.disabled = false; // 移除禁用状态
             })
             .catch(error => {
                 console.error("Failed to download video:", error);
                 alert("Failed to download video: " + error);
-                downloadButton.classList.remove("disabled");
+                downloadButton.disabled = false; // 移除禁用状态
             });
         }
 
-        // 页面卸载时撤销当前的 blob URL
+        // 页面卸载时撤销所有 Blob URL
         window.addEventListener('beforeunload', () => {
-            if (currentBlobUrl) {
-                window.URL.revokeObjectURL(currentBlobUrl);
-                console.log("Blob URL revoked on unload");
+            if (playbackBlobUrl) {
+                window.URL.revokeObjectURL(playbackBlobUrl);
+                console.log("Playback Blob URL revoked on unload");
+            }
+            if (downloadBlobUrl) {
+                window.URL.revokeObjectURL(downloadBlobUrl);
+                console.log("Download Blob URL revoked on unload");
             }
         });
     </script>
