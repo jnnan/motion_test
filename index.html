@@ -1,1 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f7f7f7;
+        }
+        #output {
+            width: 98%;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #downloadButton {
+            display: none;
+            margin-top: 10px;
+        }
+        #videoPlayer {
+            display: none;
+            width: 100%;
+            height: 600px; /* 调整视频框高度 */
+            margin-top: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        #loading {
+            display: none;
+            margin: 30px auto;
+            text-align: center;
+        }
+        .loading-container {
+            position: relative;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-text {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .progress-bar {
+            width: 80%;
+            max-width: 400px;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4CAF50, #2196F3);
+            animation: progress-animation 50s linear forwards;
+            border-radius: 4px;
+        }
+        .loading-animation {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .figure-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+        .figure {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .stick-figure {
+            position: relative;
+            width: 40px;
+            height: 100px;
+        }
+        .head {
+            position: absolute;
+            top: 0;
+            left: 15px;
+            width: 20px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 50%;
+        }
+        .body {
+            position: absolute;
+            top: 20px;
+            left: 24px;
+            width: 2px;
+            height: 40px;
+            background-color: #333;
+        }
+        .arm-left, .arm-right {
+            position: absolute;
+            top: 25px;
+            width: 25px;
+            height: 2px;
+            background-color: #333;
+        }
+        .arm-left {
+            left: 0;
+            transform-origin: right center;
+            animation: arm-swing-left 2s infinite alternate;
+        }
+        .arm-right {
+            left: 25px;
+            transform-origin: left center;
+            animation: arm-swing-right 2s infinite alternate;
+        }
+        .leg-left, .leg-right {
+            position: absolute;
+            top: 60px;
+            width: 2px;
+            height: 35px;
+            background-color: #333;
+        }
+        .leg-left {
+            left: 17px;
+            transform-origin: top center;
+            animation: leg-swing-left 2s infinite alternate;
+        }
+        .leg-right {
+            left: 31px;
+            transform-origin: top center;
+            animation: leg-swing-right 2s infinite alternate;
+        }
+        .status-icon {
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 24px;
+            vertical-align: middle;
+        }
+        .status-step {
+            margin: 10px 0;
+            text-align: left;
+            padding: 8px 15px;
+            border-radius: 6px;
+            background-color: #f0f0f0;
+            transition: all 0.3s ease;
+        }
+        .status-step.active {
+            background-color: #e8f5e9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-step.completed {
+            background-color: #e8f5e9;
+        }
+        .fun-fact {
+            margin: 15px auto;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 8px;
+            max-width: 500px;
+            text-align: center;
+            font-style: italic;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .button-27 {
+            appearance: none;
+            background-color: #000000;
+            border: 2px solid #1A1A1A;
+            border-radius: 15px;
+            box-sizing: border-box;
+            color: #FFFFFF;
+            cursor: pointer;
+            display: inline-block;
+            font-family: Roobert,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+            font-size: 16px;
+            font-weight: 600;
+            line-height: normal;
+            margin: 0;
+            min-height: 60px;
+            min-width: 0;
+            outline: none;
+            padding: 16px 24px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 300ms cubic-bezier(.23, 1, 0.32, 1);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            width: auto; /* 调整按钮宽度 */
+            width: 28%;
+            max-width: 300px; /* 设置最大宽度 */
+            will-change: transform;
+            /* float: left; 将按钮对齐到左侧 */
+            margin-right: 10px; /* 增加按钮之间的间距 */
+        }
+        .button-27:disabled {
+            background-color: #4F4F4F; /* 更深的灰色 */
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+        .button-27:hover:not(:disabled) {
+            box-shadow: rgba(0, 0, 0, 0.25) 0 8px 15px;
+            transform: translateY(-2px);
+        }
+        .button-27:active:not(:disabled) {
+            box-shadow: none;
+            transform: translateY(0);
+        }
+        /* 清除浮动 */
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
 
+        @keyframes progress-animation {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        
+        @keyframes arm-swing-left {
+            0% { transform: rotate(-15deg); }
+            100% { transform: rotate(30deg); }
+        }
+        @keyframes arm-swing-right {
+            0% { transform: rotate(15deg); }
+            100% { transform: rotate(-30deg); }
+        }
+        @keyframes leg-swing-left {
+            0% { transform: rotate(-15deg); }
+            100% { transform: rotate(15deg); }
+        }
+        @keyframes leg-swing-right {
+            0% { transform: rotate(15deg); }
+            100% { transform: rotate(-15deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Motion Generation</h1>
+    <input type="text" id="messageInput" placeholder="Describe the motion you want to generate..." style="width: 98%; padding: 10px; font-size: 18px; border-radius: 8px; border: 1px solid #ccc;">
+    <div class="clearfix" style="margin-top: 10px;">
+        <button id="sendButton" class="button-27" onclick="sendMessage()">Generate Motion</button>
+    </div>
+    <div id="loading">
+        <div class="loading-container">
+            <div class="loading-animation">
+                <div class="figure-container">
+                    <div class="figure">
+                        <div class="stick-figure">
+                            <div class="head"></div>
+                            <div class="body"></div>
+                            <div class="arm-left"></div>
+                            <div class="arm-right"></div>
+                            <div class="leg-left"></div>
+                            <div class="leg-right"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="loading-text">Generating your motion video...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="timerDisplay">Time remaining: 50 seconds</div>
+            
+            <div class="status-steps" id="statusSteps">
+                <div class="status-step" id="step1">
+                    <span class="status-icon">⏳</span> Analyzing your description...
+                </div>
+                <div class="status-step" id="step2">
+                    <span class="status-icon">🤖</span> Generating motion patterns...
+                </div>
+                <div class="status-step" id="step3">
+                    <span class="status-icon">🎬</span> Rendering video...
+                </div>
+                <div class="status-step" id="step4">
+                    <span class="status-icon">🔄</span> Processing final output...
+                </div>
+            </div>
+            
+            <div class="fun-fact" id="funFact">
+                Did you know? Human motion capture technology was first used extensively in the film industry for the character Gollum in "The Lord of the Rings".
+            </div>
+        </div>
+    </div>
+    
+    <video id="videoPlayer" controls></video>
+    <button id="downloadButton" class="button-27" onclick="downloadVideo()">Download Video</button>
+    <div id="output"></div>
+
+    <script>
+        const SERVER_URL = "https://a398-116-172-94-186.ngrok-free.app";
+        // const SERVER_URL = "http://localhost:16639";
+        let videoLink = "";
+        let playbackBlobUrl = null; // 用于播放的视频 Blob URL
+        let downloadBlobUrl = null; // 用于下载的视频 Blob URL
+        let timerInterval = null;
+        let funFactsIndex = 0;
+
+        // Motion generation fun facts to display during waiting
+        const funFacts = [
+            "Did you know? Human motion capture technology was first used extensively in the film industry for the character Gollum in 'The Lord of the Rings'.",
+            "AI-powered motion generation can create movements that would be physically impossible for humans to perform.",
+            "The average person makes approximately 20 different motion patterns while walking.",
+            "Professional dancers can remember hundreds of complex motion sequences at once.",
+            "Motion capture suits typically use 40-60 markers to record detailed human movement.",
+            "The human body has over 600 muscles that work together to create motion.",
+            "Modern AI can generate realistic motion from just text descriptions with no video input.",
+            "Motion prediction AI is now used in self-driving cars to anticipate pedestrian movements.",
+            "Olympic athletes' motions are analyzed frame-by-frame to improve performance by fractions of a second.",
+            "Virtual reality developers use motion libraries to create realistic avatars in VR environments."
+        ];
+
+        function rotateFunFacts() {
+            funFactsIndex = (funFactsIndex + 1) % funFacts.length;
+            document.getElementById("funFact").innerHTML = funFacts[funFactsIndex];
+            document.getElementById("funFact").style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById("funFact").style.transition = "opacity 1s";
+                document.getElementById("funFact").style.opacity = 1;
+            }, 200);
+        }
+
+        function startLoadingAnimation() {
+            const loading = document.getElementById("loading");
+            const progressFill = document.getElementById("progressFill");
+            const timerDisplay = document.getElementById("timerDisplay");
+            
+            loading.style.display = "block";
+            document.getElementById("step1").classList.add("active");
+            
+            // Reset progress animation
+            progressFill.style.animation = 'none';
+            void progressFill.offsetWidth; // Trigger reflow
+            progressFill.style.animation = 'progress-animation 50s linear forwards';
+            
+            // Reset timer
+            let timeLeft = 50;
+            clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `Time remaining: ${timeLeft} seconds`;
+                
+                // Update status steps based on time
+                if (timeLeft <= 38) {
+                    document.getElementById("step1").classList.remove("active");
+                    document.getElementById("step1").classList.add("completed");
+                    document.getElementById("step1").innerHTML = '<span class="status-icon">✅</span> Description analyzed';
+                    document.getElementById("step2").classList.add("active");
+                }
+                if (timeLeft <= 25) {
+                    document.getElementById("step2").classList.remove("active");
+                    document.getElementById("step2").classList.add("completed");
+                    document.getElementById("step2").innerHTML = '<span class="status-icon">✅</span> Motion patterns generated';
+                    document.getElementById("step3").classList.add("active");
+                }
+                if (timeLeft <= 12) {
+                    document.getElementById("step3").classList.remove("active");
+                    document.getElementById("step3").classList.add("completed");
+                    document.getElementById("step3").innerHTML = '<span class="status-icon">✅</span> Video rendered';
+                    document.getElementById("step4").classList.add("active");
+                }
+                
+                // Rotate fun facts every 8 seconds
+                if (timeLeft % 8 === 0) {
+                    rotateFunFacts();
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+            
+            // Start rotating fun facts
+            setInterval(rotateFunFacts, 8000);
+        }
+
+        function stopLoadingAnimation() {
+            const loading = document.getElementById("loading");
+            loading.style.display = "none";
+            clearInterval(timerInterval);
+        }
+
+        function sendMessage() {
+            const message = document.getElementById("messageInput").value;
+            const sendButton = document.getElementById("sendButton");
+            const downloadButton = document.getElementById("downloadButton");
+            const output = document.getElementById("output");
+            const controller = new AbortController();
+            const signal = controller.signal;
+
+            // Disable buttons
+            sendButton.disabled = true;
+            downloadButton.disabled = true;
+            
+            // Show loading animation
+            startLoadingAnimation();
+            output.innerHTML = "";
+
+            const timeoutId = setTimeout(() => controller.abort(), 100000); // Increased timeout
+
+            fetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message }),
+                signal: signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                stopLoadingAnimation();
+                sendButton.disabled = false;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.body;
+            })
+            .then(rb => {
+                const reader = rb.getReader();
+                const decoder = new TextDecoder();
+
+                reader.read().then(function processText({ done, value }) {
+                    if (done) {
+                        return;
+                    }
+                    let text = decoder.decode(value);
+                    output.innerHTML += text.replace(/\n/g, "<br>");
+                    output.scrollTop = output.scrollHeight;
+                    if (text.includes("Download Video")) {
+                        const startIndex = text.indexOf("/download_video?");
+                        if (startIndex !== -1) {
+                            const endIndex = text.indexOf(".mp4", startIndex) + 4;
+                            videoLink = text.substring(startIndex, endIndex);
+                            downloadButton.style.display = "block";
+                            downloadButton.disabled = false;
+
+                            // Automatically fetch and play video
+                            fetchAndPlayVideo(videoLink);
+                        }
+                    }
+                    return reader.read().then(processText);
+                });
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                stopLoadingAnimation();
+                sendButton.disabled = false;
+                downloadButton.disabled = false;
+                console.error("Failed to connect to server:", error);
+                alert("Failed to connect to server: " + error);
+            });
+        }
+
+        function fetchAndPlayVideo(link) {
+            if (!link) {
+                console.error("No video link provided.");
+                return;
+            }
+
+            // Show loading message
+            const loading = document.getElementById("loading");
+            document.querySelector(".loading-text").textContent = "Loading video...";
+            document.getElementById("progressFill").style.animation = 'progress-animation 5s linear forwards';
+            document.getElementById("timerDisplay").textContent = "Almost there...";
+            loading.style.display = "block";
+
+            // Hide status steps and fun facts
+            document.getElementById("statusSteps").style.display = "none";
+            document.getElementById("funFact").style.display = "none";
+
+            fetch(`${SERVER_URL}${link}`, {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const videoPlayer = document.getElementById("videoPlayer");
+                
+                // Clean up previous URL
+                if (playbackBlobUrl) {
+                    window.URL.revokeObjectURL(playbackBlobUrl);
+                }
+
+                playbackBlobUrl = window.URL.createObjectURL(blob);
+                videoPlayer.src = playbackBlobUrl;
+                videoPlayer.style.display = "block";
+                videoPlayer.load();
+                videoPlayer.onloadeddata = () => {
+                    videoPlayer.play();
+                };
+
+                // Hide loading
+                loading.style.display = "none";
+                document.getElementById("statusSteps").style.display = "block";
+                document.getElementById("funFact").style.display = "block";
+            })
+            .catch(error => {
+                loading.style.display = "none";
+                document.getElementById("statusSteps").style.display = "block";
+                document.getElementById("funFact").style.display = "block";
+                console.error("Failed to load video:", error);
+                alert("Failed to load video: " + error);
+            });
+        }
+
+        function downloadVideo() {
+            const downloadButton = document.getElementById("downloadButton");
+
+            // Disable download button
+            downloadButton.disabled = true;
+
+            if (downloadBlobUrl) {
+                window.URL.revokeObjectURL(downloadBlobUrl);
+                console.log("Previous Download Blob URL revoked");
+            }
+
+            console.log(`Downloading video from ${SERVER_URL}${videoLink}`);
+            fetch(`${SERVER_URL}${videoLink}`, {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                downloadBlobUrl = window.URL.createObjectURL(blob);
+
+                // Create download link
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadBlobUrl;
+                a.download = videoLink.split('=')[1];
+                document.body.appendChild(a);
+                a.click();
+
+                // Revoke URL after download completes
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(downloadBlobUrl);
+                    console.log("Download Blob URL revoked");
+                }, 10000);
+
+                alert("Video saved to your downloads folder");
+                downloadButton.disabled = false;
+            })
+            .catch(error => {
+                console.error("Failed to download video:", error);
+                alert("Failed to download video: " + error);
+                downloadButton.disabled = false;
+            });
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (playbackBlobUrl) {
+                window.URL.revokeObjectURL(playbackBlobUrl);
+                console.log("Playback Blob URL revoked on unload");
+            }
+            if (downloadBlobUrl) {
+                window.URL.revokeObjectURL(downloadBlobUrl);
+                console.log("Download Blob URL revoked on unload");
+            }
+        });
+    </script>
+</body>
+</html>
